@@ -7,54 +7,58 @@ export default function App() {
   const [stompClient, setStompClient] = useState<Client | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [inputMessage, setInputMessage] = useState<string>('');
+  const conversationId = 59; // Replace with the actual conversation ID
 
   useEffect(() => {
-    const socketURL = 'http://10.0.2.2:9090/api/ws'; // this is a local url
-
-    // Initialize SockJS and STOMP
+    const socketURL = 'https://socker.peaqock.com/api/ws';
+  
     const socket = new SockJS(socketURL);
     const client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
       debug: (str) => console.log(str),
     });
-
+  
     client.onConnect = () => {
       console.log('Connected to WebSocket!');
-
-      // subscribe to a topic
-      client.subscribe('/topic/messages', (message) => {
-        setMessages((prevMessages) => [...prevMessages, message.body]);
+  
+      const topic = `/topic/conversation/${conversationId}`;
+      console.log('topic :', topic);
+      client.subscribe(topic, (message) => {
+        const messageBody = JSON.parse(message.body); // Parse the JSON
+        console.log('messageBody :', messageBody);
+  
+        // Update messages with the content
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          `${messageBody.sender.firstName}: ${messageBody.message}`,
+        ]);
       });
     };
-
+  
     client.onStompError = (error) => {
-      console.error('Detailed STOMP Error:', error);
-      console.log('Connection Details:', {
-        url: socketURL,
-        readyState: socket.readyState
-      });
+      console.error('STOMP Error:', error);
     };
-
+  
     client.activate();
     setStompClient(client);
-
+  
     return () => {
       client.deactivate();
     };
-  }, []);
+  }, [conversationId]);   // Reinitialize if conversationId changes
 
   const sendMessage = () => {
     if (stompClient && inputMessage) {
       const messagePayload = {
-        conversationId: 59,
+        conversationId,
         message: inputMessage,
-        userId: 2,
-        fileKey: null
+        userId: 8953, // Replace with the actual user ID
+        fileKey: null,
       };
-  
+
       stompClient.publish({
-        destination: '/app/message',
+        destination: '/app/message', // Matches the @MessageMapping path in the backend
         body: JSON.stringify(messagePayload),
       });
       setInputMessage('');
@@ -63,7 +67,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>WebSocket Test Client</Text>
+      <Text style={styles.header}>Conversation {conversationId}</Text>
       <ScrollView style={styles.messageContainer}>
         {messages.map((msg, index) => (
           <Text key={index} style={styles.message}>
